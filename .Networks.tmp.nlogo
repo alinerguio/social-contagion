@@ -645,7 +645,7 @@ to change-users-positioning ; if user is neutral and its inserted in a polarized
           set left-friends lput self left-friends
         ]
       ]
-      if (length right-friends) - (length left-friends) >  [
+      if (length right-friends)  (length left-friends) [
       ]
     ]
   ]
