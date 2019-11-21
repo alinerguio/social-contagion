@@ -30,13 +30,9 @@ globals [ path
   max_closeness
   max_eigen
   max_friends
-  average_friends
+  average_friendsa
   std_friends
   user-list
-]
-
-edges-own [
-  strengh
 ]
 
 users-own [
@@ -59,6 +55,7 @@ users-own [
 ]
 
 tweets-own [
+  tweet-root-id     ; so we can be able to find the root
   tweet-owner
   tweet-sharer
   time-tick         ; tick when the tweet was created
@@ -75,6 +72,7 @@ to setup
   layout-network
   render-plot
   stats
+  setup-colors
   setup-influencers
 
   reset-ticks
@@ -91,7 +89,6 @@ to setup-erdos-renyii                              ; erdos-renyi
   nw:generate-random users edges num-nodes p       ; random network w/ probability prob-link of making a link
   ask users[
     set shape "circle"
-    set color blue
     set size 1.25
     set influencer? false
     set tweeting-rate -1
@@ -110,7 +107,6 @@ to setup-barabasi-albert[ num-users prob-link max-links ]  ; barabasi-albert
                                                            ; sets up network with preferential attraction
   create-users num-nodes [
     set shape "circle"
-    set color blue
     set size 1.25
     set influencer? false
     set tweeting-rate -1
@@ -120,6 +116,7 @@ to setup-barabasi-albert[ num-users prob-link max-links ]  ; barabasi-albert
     set user-mood random-float 1
     set retweet-list []
     set tweet-list []
+
     let spot one-of patches with[not any? users-here]
     ifelse (spot != nobody) [
       move-to spot
@@ -150,7 +147,6 @@ to setup-small-world[ num-users num-links prob-rewire ]  ; small-world
                                                          ; build a "small world" network
   create-users num-users [
     set shape "circle"
-    set color blue
     set size 1.25
     set influencer? false
     set user-positioning random-float 1
@@ -213,7 +209,6 @@ to setup-uniform[ num-users num-links ]     ; uniform
                                             ; each user has num-links links
   create-users num-users [
     set shape "circle"
-    set color blue
     set size 1.25
     set influencer? false
     set user-positioning random-float 1
@@ -349,6 +344,7 @@ to go
   ]
   if #-users-changing-positioning[
     change-users-positioning
+    setup-colors
   ]
   tick
 end
@@ -409,7 +405,6 @@ to stats
   set max_closeness max [closeness] of users
   set max_friends max [friends] of users
   set std_friends standard-deviation [friends] of users
-  set average_friends mean [friends] of users
 
   if [eigen] of user 0 != false [
    set average_eigen mean [eigen] of users
@@ -423,11 +418,14 @@ to setup-influencers
   let degreeSortedList (sort-on [(- friends)] users)
   let influencersList (sublist degreeSortedList 0 #-influencers)
 
+  ask users [
+    set size 1.25
+  ]
+
   foreach influencersList [
       influencer -> ask influencer [
        set influencer? true
-       set size 2
-       set color yellow
+       set size 2.25
        set tweeting-rate random-float influencers-rate
       ]
   ]
@@ -450,6 +448,7 @@ to generate-tweets ; generate new tweets by influencers according with its varia
         set positioning user-positioning
         set if-fake random-float 1
            hatch-tweets 1[
+             set tweet-root-id self
              set new-tweet-id self
              set tweet-owner myself
              set tweet-sharer myself
@@ -509,7 +508,7 @@ to retweet-tweets
   ;print "\ntweets ready to be retweeted - from last tick: "
   ;show filterTweets
 
-  let tweet-root-id 0
+  let tweet-root-id-retweet 0
   let tweet-owner-retweet 0
   let tweet-emotion-retweet 0
   let tweet-positioning-retweet 0
@@ -520,7 +519,7 @@ to retweet-tweets
 
   foreach filterTweets [
     fTweet -> ask fTweet [
-      set tweet-root-id self
+      set tweet-root-id-retweet tweet-root-id
       set tweet-owner-retweet tweet-owner
       set tweet-emotion-retweet tweet-emotion
       set tweet-positioning-retweet tweet-positioning
@@ -533,23 +532,21 @@ to retweet-tweets
       ask tweet-sharer [
         ask link-neighbors [  ; linked to the sharer
           set comparable-interest abs(tweet-positioning-retweet - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
-          if (comparable-interest < #-threashold-tweet-interest) and (not member? tweet-root-id retweet-list)[
+          if (not member? tweet-root-id-retweet retweet-list) and (comparable-interest < #-threashold-tweet-interest)[
              set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
           ]
         ]
       ]
 
-      ;print "\n-------- tweet and users that want to retweet --------"
-      ;show users-retweeting
-
       foreach users-retweeting [
         user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
           hatch-tweets 1[
+            set tweet-root-id tweet-root-id-retweet
             set new-retweet-id self
             set tweet-owner tweet-owner-retweet
             set tweet-sharer myself
             set time-tick ticks
-            set tweet-emotion tweet-emotion-retweet  ; !!!!! mudar
+            set tweet-emotion tweet-emotion-retweet  ; !!!!! mudar ??
             set tweet-positioning tweet-positioning-retweet
             set root? false
             set fake? fake-retweet?
@@ -611,8 +608,6 @@ end
 
 to refresh-links-unfollow
   ask users [
-    print "--------USER--------"
-    print self
     let list-to-compare retweet-list
 
     ask link-neighbors [
@@ -635,19 +630,49 @@ end
 to change-users-positioning ; if user is neutral and its inserted in a polarized environment, they can change opinions
   let right-friends []
   let left-friends []
+  let neutral-friends []
+
   ask users [
     if (user-positioning > 0.45) and (user-positioning < 0.55) [
+      print "OKAY HERE WE HAVE A NEUTRAL NODE"
+      show self
       ask link-neighbors [
-        if user-positioning < 0.45 [
+        (ifelse user-positioning > 0.55 [
           set right-friends lput self right-friends
-        ]
-        if user-positioning > 0.55 [
+        ] user-positioning < 0.45 [
           set left-friends lput self left-friends
-        ]
+        ] [
+          set neutral-friends lput self neutral-friends
+        ])
       ]
-      if (length right-friends)  (length left-friends) [
+
+      print "AND IT HAS RIGHT FRIENDS"
+      show right-friends
+      print "AND IT HAS LEFT FRIENDS"
+      show left-friends
+      print "AND IT HAS NEUTRAL FRIENDS"
+      show neutral-friends
+
+      if (length right-friends + length left-friends) > (length neutral-friends) [
+        ifelse(length right-friends > length left-friends)[
+          set user-positioning (user-positioning + (length right-friends * 0.001)) ;;;; need to see math
+        ][
+          set user-positioning (user-positioning + (length left-friends * 0.001))
+        ]
       ]
     ]
+  ]
+end
+
+to setup-colors
+  ask users [
+    (ifelse user-positioning > 0.55 [
+        set color blue
+     ] user-positioning < 0.45 [
+        set color yellow
+     ][
+        set color white
+     ])
   ]
 end
 @#$#@#$#@
@@ -915,7 +940,7 @@ num-nodes
 num-nodes
 0
 1000
-10.0
+55.0
 5
 1
 NIL
@@ -930,7 +955,7 @@ SLIDER
 #-influencers
 0
 250
-5.0
+20.0
 1
 1
 NIL
