@@ -566,7 +566,7 @@ to refresh-links-follow
     let listed-users []
     foreach retweet-list [
       retweet -> ask retweet [
-        let tweet-sharer (item 2 retweet)
+        let tweet-sharer (item 2 )
         if not member? tweet-sharer linked-friends and tweet-sharer != myself[
           set listed-users lput tweet-sharer listed-users
         ]
@@ -592,7 +592,7 @@ to refresh-links-unfollow
       let keep? false
       foreach list-to-compare [
         tweet-listed -> ask tweet-listed [
-          let tweet-sharer (item 2 tweet-listed)
+          let tweet-sharer (item 2 fTweet)
           if self = tweet-sharer [
             set keep? true
           ]
@@ -924,7 +924,7 @@ num-nodes
 num-nodes
 0
 1000
-25.0
+55.0
 5
 1
 NIL
@@ -939,7 +939,7 @@ SLIDER
 #-influencers
 0
 250
-8.0
+20.0
 1
 1
 NIL
@@ -1121,6 +1121,28 @@ MONITOR
 373
 All Tweets
 length all-tweets
+17
+1
+11
+
+MONITOR
+1096
+388
+1163
+433
+Retweets
+count tweets with[root? = false]
+17
+1
+11
+
+MONITOR
+1177
+387
+1234
+432
+Tweets
+count tweets with[root? = true]
 17
 1
 11
