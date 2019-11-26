@@ -444,11 +444,14 @@ to generate-tweets ; generate new tweets by influencers according with its varia
         ][
           set new-tweet (list id-tweets id-tweets self ticks mood positioning false)
         ]
-
+        print "\n---------- new tweet but as list ----------"
+        show new-tweet
         set new-post id-tweets
         set id-tweets (id-tweets + 1)
 
         set all-tweets lput new-tweet all-tweets
+        print "\n---------- okay here's the almighty list ----------"
+        show all-tweets
         set tweet-list lput new-tweet tweet-list  ; set new-post tweet
 
         set tweeting-rate random-float influencers-rate   ; change at every tick because of the if
@@ -488,8 +491,8 @@ to retweet-tweets
     ]
   ]
 
-  ;print "\ntweets ready to be retweeted - from last tick: "
-  ;show filtertweets
+  print "\ntweets ready to be retweeted - from last tick: "
+  show filtertweets
 
   ; variables of tweet
   let tweet-root-id-retweet 0
@@ -502,51 +505,56 @@ to retweet-tweets
   let new-retweet-id 0
 
   foreach filtertweets [
-    fTweet -> ask fTweet [
-      set tweet-root-id-retweet (item 1 fTweet)
-      set tweet-emotion-retweet (item 4 fTweet)
-      set tweet-positioning-retweet (item 5 fTweet)
-      set fake-retweet? (item 6 fTweet)
+    set tweet-root-id-retweet (item 1 ?)
+    set tweet-emotion-retweet (item 4 ?)
+    set tweet-positioning-retweet (item 5 ?)
+    set fake-retweet? (item 6 ?)
 
-      let comparable-interest 0
-      let retweet? false
-      set users-retweeting []
+    let comparable-interest 0
+    let retweet? false
+    set users-retweeting []
 
-      let tweet-sharer (item 2 fTweet)
+    let tweet-sharer (item 2 ?)
 
-      ask tweet-sharer [
-        ask link-neighbors [  ; linked to the sharer
-          set comparable-interest abs(tweet-positioning-retweet - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
-          if comparable-interest < #-threashold-tweet-interest [
-             set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
-          ]
+    ask tweet-sharer [
+      ask link-neighbors [  ; linked to the sharer
+        set comparable-interest abs(tweet-positioning-retweet - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
+        if comparable-interest < #-threashold-tweet-interest [
+           set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
         ]
       ]
+    ]
 
-      foreach users-retweeting [
-        user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
+    set users-retweeting remove-duplicates users-retweeting
 
-          let new-retweet (list id-tweets tweet-root-id-retweet self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
+    foreach users-retweeting [
+      user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
 
-          set new-post id-tweets
-          set id-tweets (id-tweets + 1)
+        let new-retweet (list id-tweets tweet-root-id-retweet self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
 
-          set all-tweets lput new-retweet all-tweets
-          set retweet-list lput new-post retweet-list
+        print "\n---------- new retweet but as list ----------"
+        show new-retweet
 
-          let my-links-to-friends []
-          set my-links-to-friends sort my-out-links
+        set new-post id-tweets
+        set id-tweets (id-tweets + 1)
 
-          foreach my-links-to-friends [
-            mlink -> ask mlink [
-              ifelse fake-retweet? [
-                set color 17
-              ][
-                set color 57
-              ]
-              set thickness .3
-              set shape "friendship"
+        set all-tweets lput new-retweet all-tweets
+        print "\n---------- okay here's the almighty list ----------"
+        show all-tweets
+        set retweet-list lput new-post retweet-list
+
+        let my-links-to-friends []
+        set my-links-to-friends sort my-out-links
+
+        foreach my-links-to-friends [
+          mlink -> ask mlink [
+            ifelse fake-retweet? [
+              set color 17
+            ][
+              set color 57
             ]
+            set thickness .3
+            set shape "friendship"
           ]
         ]
       ]
@@ -565,11 +573,9 @@ to refresh-links-follow
 
     let listed-users []
     foreach retweet-list [
-      retweet -> ask retweet [
-        let tweet-sharer (item 2 retweet)
-        if not member? tweet-sharer linked-friends and tweet-sharer != myself[
-          set listed-users lput tweet-sharer listed-users
-        ]
+      let tweet-sharer (item 2 retweet)
+      if not member? tweet-sharer linked-friends and tweet-sharer != myself[
+        set listed-users lput tweet-sharer listed-users
       ]
     ]
 
@@ -591,11 +597,9 @@ to refresh-links-unfollow
     ask link-neighbors [
       let keep? false
       foreach list-to-compare [
-        tweet-listed -> ask tweet-listed [
-          let tweet-sharer (item 2 tweet-listed)
-          if self = tweet-sharer [
-            set keep? true
-          ]
+        let tweet-sharer (item 2 tweet-listed)
+        if self = tweet-sharer [
+          set keep? true
         ]
       ]
       if keep? [
@@ -613,8 +617,6 @@ to change-users-positioning ; if user is neutral and its inserted in a polarized
 
   ask users [
     if (user-positioning > 0.45) and (user-positioning < 0.55) [
-      print "OKAY HERE WE HAVE A NEUTRAL NODE"
-      show self
       ask link-neighbors [
         (ifelse user-positioning > 0.55 [
           set right-friends lput self right-friends
@@ -625,18 +627,11 @@ to change-users-positioning ; if user is neutral and its inserted in a polarized
         ])
       ]
 
-      print "AND IT HAS RIGHT FRIENDS"
-      show right-friends
-      print "AND IT HAS LEFT FRIENDS"
-      show left-friends
-      print "AND IT HAS NEUTRAL FRIENDS"
-      show neutral-friends
-
       if (length right-friends + length left-friends) > (length neutral-friends) [
         ifelse(length right-friends > length left-friends)[
-          set user-positioning (user-positioning + (length right-friends * 0.001)) ;;;; need to see math
+          set user-positioning (user-positioning + (length right-friends * #-influence-positioning)) ;;;; need to see math
         ][
-          set user-positioning (user-positioning + (length left-friends * 0.001))
+          set user-positioning (user-positioning + (length left-friends * #-influence-positioning))
         ]
       ]
     ]
@@ -1115,15 +1110,40 @@ users that are inserted in a strong enviroment, can change positioning
 1
 
 MONITOR
-1096
-328
-1171
-373
+1104
+389
+1179
+434
 All Tweets
 length all-tweets
 17
 1
 11
+
+SLIDER
+1109
+330
+1311
+363
+#-influence-positioning
+#-influence-positioning
+0
+1
+0.002
+0.001
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+1106
+282
+1316
+338
+how much it increases for each friend when a node is nserted in a skewed environment
+11
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
