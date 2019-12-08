@@ -326,6 +326,7 @@ to go
   step
   generate-tweets
   retweet-tweets
+
   if #-users-changing-friends[
     refresh-links-follow
     if ticks > 5 [
@@ -333,10 +334,12 @@ to go
     ]
     setup-influencers
   ]
+
   if #-users-changing-positioning[
     change-users-positioning
     setup-colors
   ]
+
   tick
 end
 
@@ -414,11 +417,11 @@ to setup-influencers
   ]
 
   foreach influencersList [
-      influencer -> ask influencer [
+     influencer -> ask influencer [
        set influencer? true
        set size 2.25
        set tweeting-rate random-float influencers-rate
-      ]
+     ]
   ]
 end
 
@@ -444,33 +447,9 @@ to generate-tweets ; generate new tweets by influencers according with its varia
         ][
           set new-tweet (list id-tweets id-tweets self ticks mood positioning false)
         ]
-        print "\n---------- new tweet but as list ----------"
-        show new-tweet
-        set new-post id-tweets
-        set id-tweets (id-tweets + 1)
-
-        set all-tweets lput new-tweet all-tweets
-        print "\n---------- okay here's the almighty list ----------"
-        show all-tweets
-        set tweet-list lput new-tweet tweet-list  ; set new-post tweet
-
+        let boolean share-tweet new-tweet
         set tweeting-rate random-float influencers-rate   ; change at every tick because of the if
                                                           ; maybe change the humor ? - make change-status procedure
-
-        let my-links-to-friends []
-        set my-links-to-friends sort my-out-links
-
-        foreach my-links-to-friends [
-          mlink -> ask mlink [
-            ifelse if-fake > 0.5 [
-              set color green
-            ][
-              set color red
-            ]
-            set thickness .3
-            set shape "friendship"
-          ]
-        ]
      ]
     ]
   ]
@@ -484,84 +463,78 @@ to retweet-tweets
   let filtertweets []
 
   foreach all-tweets [    ; filter the tweets that were tweeted or retweeted in the last tick
-    fTweet -> ask fTweet [
+    fTweet ->
       if  (ticks > 0) and (item 3 fTweet = (ticks - 1)) [
          set filtertweets lput fTweet filtertweets
       ]
-    ]
   ]
-
-  print "\ntweets ready to be retweeted - from last tick: "
-  show filtertweets
-
-  ; variables of tweet
-  let tweet-root-id-retweet 0
-  let tweet-emotion-retweet 0
-  let tweet-positioning-retweet 0
-  let fake-retweet? false
-
   let users-retweeting []
-
   let new-retweet-id 0
+  let tweet-root-id []
 
   foreach filtertweets [
-    set tweet-root-id-retweet (item 1 ?)
-    set tweet-emotion-retweet (item 4 ?)
-    set tweet-positioning-retweet (item 5 ?)
-    set fake-retweet? (item 6 ?)
+    fTweet ->
+      let comparable-interest 0
+      let retweet? false
+      set users-retweeting []
 
-    let comparable-interest 0
-    let retweet? false
-    set users-retweeting []
+      let tweet-sharer (item 2 fTweet)
 
-    let tweet-sharer (item 2 ?)
-
-    ask tweet-sharer [
-      ask link-neighbors [  ; linked to the sharer
-        set comparable-interest abs(tweet-positioning-retweet - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
-        if comparable-interest < #-threashold-tweet-interest [
-           set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
-        ]
-      ]
-    ]
-
-    set users-retweeting remove-duplicates users-retweeting
-
-    foreach users-retweeting [
-      user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
-
-        let new-retweet (list id-tweets tweet-root-id-retweet self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
-
-        print "\n---------- new retweet but as list ----------"
-        show new-retweet
-
-        set new-post id-tweets
-        set id-tweets (id-tweets + 1)
-
-        set all-tweets lput new-retweet all-tweets
-        print "\n---------- okay here's the almighty list ----------"
-        show all-tweets
-        set retweet-list lput new-post retweet-list
-
-        let my-links-to-friends []
-        set my-links-to-friends sort my-out-links
-
-        foreach my-links-to-friends [
-          mlink -> ask mlink [
-            ifelse fake-retweet? [
-              set color 17
-            ][
-              set color 57
-            ]
-            set thickness .3
-            set shape "friendship"
+      ask tweet-sharer [
+        ask link-neighbors [  ; linked to the sharer
+          set tweet-root-id tweets-retweets-list
+          set comparable-interest abs((item 5 fTweet) - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
+          if (comparable-interest < #-threashold-tweet-interest) and (not member? (item 1 fTweet) tweet-root-id)[
+            set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
           ]
         ]
       ]
-    ]
+      print "---------- show ----------"
+      show fTweet
+      show users-retweeting
+      print "--------------------------"
+
+      foreach users-retweeting [
+        user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
+          let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
+          let boolean share-tweet new-retweet
+        ]
+      ]
   ]
 end
 
+to-report share-tweet [tweet] ; problema - report?
+  set id-tweets (id-tweets + 1) ; increment of the id-tweet
+
+  set all-tweets lput tweet all-tweets
+  set retweet-list lput (item 0 tweet) retweet-list
+  let my-links-to-friends []
+
+
+   set my-links-to-friends sort my-out-links
+
+    foreach my-links-to-friends [ ; problema - deveria funcionar
+      mlink -> ask mlink [
+        (ifelse ((item 0 tweet) = (item 1 tweet)) and (item 6 tweet)[
+          set color 15
+          ; print "true and tweet"
+        ]((item 0 tweet) = (item 1 tweet))[
+          ; print "fake and tweet"
+          set color 55
+        ]((item 0 tweet) != (item 1 tweet)) and (item 6 tweet)[
+          ; print "true and retweet"
+          set color 17
+        ]((item 0 tweet) != (item 1 tweet))[
+          ; print "fake and retweet"
+          set color 57
+        ])
+        set thickness .3
+        set shape "friendship"
+      ]
+    ]
+
+  report true
+end
 
 to refresh-links-follow
   ask users [
@@ -572,11 +545,14 @@ to refresh-links-follow
     ]
 
     let listed-users []
+    let tweet-sharer nobody
+
     foreach retweet-list [
-      let tweet-sharer (item 2 retweet)
-      if not member? tweet-sharer linked-friends and tweet-sharer != myself[
-        set listed-users lput tweet-sharer listed-users
-      ]
+      retweet ->
+        set tweet-sharer find-tweet-sharer retweet
+        if (tweet-sharer != nobody) and (not member? tweet-sharer linked-friends) and (tweet-sharer != self)[
+          set listed-users lput tweet-sharer listed-users
+        ]
     ]
 
     set listed-users remove-duplicates listed-users
@@ -596,15 +572,17 @@ to refresh-links-unfollow
 
     ask link-neighbors [
       let keep? false
+      let tweet-sharer nobody
       foreach list-to-compare [
-        let tweet-sharer (item 2 tweet-listed)
-        if self = tweet-sharer [
-          set keep? true
-        ]
+        tweet-listed ->
+        set tweet-sharer find-tweet-sharer tweet-listed
+          if tweet-sharer != nobody and self = tweet-sharer [
+            set keep? true
+          ]
       ]
       if keep? [
         print self
-        die ;;;;;;;;;;;;; link - but it is edge
+        die
       ]
     ]
   ]
@@ -653,6 +631,38 @@ end
 to setup-tweets
   set all-tweets []
   set id-tweets 0
+end
+
+
+to-report find-tweet [id-to-search]
+  foreach all-tweets [
+   tweet ->
+      if id-to-search = (item 0 tweet) [
+        report tweet
+      ]
+  ]
+  report []
+end
+
+to-report find-tweet-sharer [id-to-search]
+  let tweet find-tweet id-to-search
+  if not empty? tweet [
+    report (item 2 tweet)
+  ]
+  report nobody
+end
+
+to-report tweets-retweets-list
+  let tweet-root-id []
+  foreach retweet-list [
+      tweet ->
+        set tweet-root-id lput tweet tweet-root-id
+    ]
+    foreach tweet-list [
+      tweet ->
+        set tweet-root-id lput tweet tweet-root-id
+    ]
+  report tweet-root-id
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -1062,7 +1072,7 @@ SLIDER
 #-threashold-tweet-interest
 0
 1
-0.3
+0.25
 0.05
 1
 NIL
@@ -1095,7 +1105,7 @@ SWITCH
 267
 #-users-changing-positioning
 #-users-changing-positioning
-1
+0
 1
 -1000
 
