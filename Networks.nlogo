@@ -447,7 +447,7 @@ to generate-tweets ; generate new tweets by influencers according with its varia
         ][
           set new-tweet (list id-tweets id-tweets self ticks mood positioning false)
         ]
-        let boolean share-tweet new-tweet
+        share-tweet new-tweet
         set tweeting-rate random-float influencers-rate   ; change at every tick because of the if
                                                           ; maybe change the humor ? - make change-status procedure
      ]
@@ -497,13 +497,13 @@ to retweet-tweets
       foreach users-retweeting [
         user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
           let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
-          let boolean share-tweet new-retweet
+          share-tweet new-retweet
         ]
       ]
   ]
 end
 
-to-report share-tweet [tweet] ; problema - report?
+to share-tweet [tweet]
   set id-tweets (id-tweets + 1) ; increment of the id-tweet
 
   set all-tweets lput tweet all-tweets
@@ -513,7 +513,7 @@ to-report share-tweet [tweet] ; problema - report?
 
    set my-links-to-friends sort my-out-links
 
-    foreach my-links-to-friends [ ; problema - deveria funcionar
+    foreach my-links-to-friends [
       mlink -> ask mlink [
         (ifelse ((item 0 tweet) = (item 1 tweet)) and (item 6 tweet)[
           set color 15
@@ -532,8 +532,6 @@ to-report share-tweet [tweet] ; problema - report?
         set shape "friendship"
       ]
     ]
-
-  report true
 end
 
 to refresh-links-follow
@@ -1072,7 +1070,7 @@ SLIDER
 #-threashold-tweet-interest
 0
 1
-0.25
+0.4
 0.05
 1
 NIL
