@@ -441,10 +441,10 @@ to generate-tweets
         let positioning user-positioning
         let new-tweet []
         let if-fake random-float 1 ; random parameter - could be a slider threashold
-        ifelse if-fake > 0.5 [ ; tweet structure: [id id-root tweet-sharer tick mood positioning fake?]
-          set new-tweet (list id-tweets id-tweets self ticks mood positioning true)
+        ifelse if-fake > 0.5 [ ; tweet structure: [id id-root tweet-sharer tick mood positioning fake? last-sharer]
+          set new-tweet (list id-tweets id-tweets self ticks mood positioning true self)
         ][
-          set new-tweet (list id-tweets id-tweets self ticks mood positioning false)
+          set new-tweet (list id-tweets id-tweets self ticks mood positioning false self)
         ]
         set tweet-list lput (item 0 new-tweet) tweet-list
         share-tweet new-tweet ; function that was repeated code in generate and retweet
@@ -483,7 +483,7 @@ to retweet-tweets
 
         foreach users-retweeting [
           user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
-            let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet structure: [id id-root tweet-sharer tick mood positioning fake?]
+            let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet) (item 2 fTweet)) ; tweet structure: [id id-root tweet-sharer tick mood positioning fake? last-sharer]
             set retweet-list lput (item 0 new-retweet) retweet-list
             share-tweet new-retweet
 
@@ -529,11 +529,16 @@ to refresh-links-follow ; apparently doesn't work
   ask users [
     let listed-users [] ; list with users that current user will follow
     let tweet-sharer nobody
+    let linked-friends []
+
+    ask link-neighbors [
+      set linked-friends lput self linked-friends
+    ]
 
     foreach retweet-list [ ; goes throught all the tweets from the user
       retweet ->
-        set tweet-sharer find-tweet-sharer retweet
-        if (tweet-sharer != nobody) and (not member? tweet-sharer link-neighbors) and (tweet-sharer != self)[ ; see if the sharer of that tweet isn't already their friend
+        set tweet-sharer find-tweet-last-sharer retweet
+        if (tweet-sharer != nobody) and (not member? tweet-sharer linked-friends) and (tweet-sharer != self)[ ; see if the sharer of that tweet isn't already their friend
           set listed-users lput tweet-sharer listed-users ; if they aren't, theyl'll be put on this list
         ]
     ]
@@ -560,18 +565,18 @@ to refresh-links-unfollow ; apparently doesn't work
     let list-to-compare retweet-list ; retweet list from the main user
 
     ask link-neighbors [
-      let unfollow? true
+      let unfollow?
       let tweet-sharer nobody
       foreach list-to-compare [ ; foreach all their retweet list
         tweet-listed ->
-          set tweet-sharer find-tweet-sharer tweet-listed ; get the sharer of the tweet
+          set tweet-sharer find-tweet-last-sharer tweet-listed ; get the sharer of the tweet
           if tweet-sharer != nobody and self = tweet-sharer [ ; if the tweeted sharer did tweet something, they won't be unfollowed
             set unfollow? false
           ]
       ]
       if unfollow? [ ; if they weren't he author of any tweets retweeted, they'll be unfollowed
         print "------------ UNFOLLOW FRIEND ------------"
-        ; die
+        die
       ]
     ]
   ]
@@ -657,12 +662,12 @@ end
 ; FIND TWEET SHARER
 ;
 ; used in refresh-links-follow and refresh-links-unfollow
-; procedure that returns the user that tweeted or retweeted that tweet reciving the id from the tweet
+; procedure that returns the user that tweeted or retweeted the tweet to the current user retweet
 ;
-to-report find-tweet-sharer [id-to-search]
+to-report find-tweet-last-sharer [id-to-search]
   let tweet find-tweet id-to-search
   if not empty? tweet [
-    report (item 2 tweet)
+    report (item 7 tweet)
   ]
   report nobody
 end
