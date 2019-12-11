@@ -3,7 +3,7 @@
 ; Aline Guimarães
 ;
 ;
-;
+; COMENTAR O CODIGO
 ; -----------------------------------------------------------------------------------
 ; Base code by:
 ; steve scott
@@ -62,9 +62,9 @@ to setup
   layout-network
   render-plot
   stats
-  setup-colors
-  setup-influencers
-  setup-tweets
+  setup-colors        ; procedure to setup the color of the node depending on its positioning
+  setup-influencers   ; procedure to setup the influencers (size) dependig on its quantity of links
+  setup-tweets        ; procedure to inicialize global variables: all-tweets = [] and id-tweets = 0
 
   reset-ticks
 end
@@ -317,27 +317,24 @@ to layout-network
   if layout-type = "centroid" [ repeat 20 [ layout-centroid 2 ] ]
 end
 
-to step
-  render-plot
-end
 
 to go
   print "\n============================== tick ==============================\n "
-  step
+  render-plot
   generate-tweets
   retweet-tweets
 
-  if #-users-changing-friends[
+  if #-users-changing-friends[      ; switch to change links
     refresh-links-follow
-    if ticks > 5 [
+    if ticks > 5 [                  ; if is needed, because the nodes has to generate content before the algorithm judges if the actual node like its content
       refresh-links-unfollow
     ]
-    setup-influencers
+    setup-influencers               ; has to setup again because the color can change
   ]
 
-  if #-users-changing-positioning[
+  if #-users-changing-positioning[  ; switch to change variable positioning if the node is in a skewed enviroment
     change-users-positioning
-    setup-colors
+    setup-colors                    ; has to setup again because the color can change
   ]
 
   tick
@@ -408,16 +405,21 @@ to stats
 
 end
 
+; SETUP INFLUENCERS
+;
+; used in setup and go
+; procedure to setup the influencers (size) dependig on its quantity of links
+;
 to setup-influencers
-  let degreeSortedList (sort-on [(- friends)] users)
-  let influencersList (sublist degreeSortedList 0 #-influencers)
+  let degreeSortedList (sort-on [(- friends)] users) ; get the ones with the biggest number of friends
+  let influencersList (sublist degreeSortedList 0 #-influencers) ; get a sublist with the number of influencers (slide)
 
-  ask users [
+  ask users [ ; set all users
     set size 1.25
   ]
 
   foreach influencersList [
-     influencer -> ask influencer [
+     influencer -> ask influencer [ ; characteristics of influencers
        set influencer? true
        set size 2.25
        set tweeting-rate random-float influencers-rate
@@ -425,174 +427,170 @@ to setup-influencers
   ]
 end
 
-to generate-tweets ; generate new tweets by influencers according with its variables
-  let degreeSortedList (sort-on [(- friends)] users)
-  let influencersList (sublist degreeSortedList 0 #-influencers)
-
-  let if-fake 0
-  let mood 0
-  let positioning 0
-  let new-tweet-id 0
-
-  ;print "\ntweets being created in this tick: "
-  foreach influencersList [
-    influencer -> ask influencer [
-      if tweeting-rate > #-medium-rate [
-        set mood user-mood
-        set positioning user-positioning
+; GENERATE TWEETS
+;
+; used in go
+; procedure to generate tweets with its random characteristics - only influencers
+; tweet is added on all-tweets (global) and its id is added on the users tweet-list
+;
+to generate-tweets
+  ask users [
+    if influencer? [
+      if tweeting-rate > #-medium-rate [ ; medium tweeting rate - variable in the slider
+        let mood user-mood
+        let positioning user-positioning
         let new-tweet []
-        set if-fake random-float 1
-        ifelse if-fake > 0.5 [ ; tweet [id id-root tweet-sharer tick mood positioning fake?]
+        let if-fake random-float 1 ; random parameter - could be a slider threashold
+        ifelse if-fake > 0.5 [ ; tweet structure: [id id-root tweet-sharer tick mood positioning fake?]
           set new-tweet (list id-tweets id-tweets self ticks mood positioning true)
         ][
           set new-tweet (list id-tweets id-tweets self ticks mood positioning false)
         ]
-        share-tweet new-tweet
+        set tweet-list lput (item 0 new-tweet) tweet-list
+        share-tweet new-tweet ; function that was repeated code in generate and retweet
         set tweeting-rate random-float influencers-rate   ; change at every tick because of the if
-                                                          ; maybe change the humor ? - make change-status procedure
      ]
     ]
   ]
 end
 
+; RETWEET TWEETS
+;
+; used in go
+; procedure to retweet tweets, depending of the interest and positioning
+; the retweet consists in creating a new list (tweet) with equal characteristics to the one that's being retweeted
+; tweet is added on all-tweets (global) and its id is added on the users tweet-list
+; only tweets from the last tick can be retweeted
+;
 to retweet-tweets
-  ; recebe info do tweet, root false
-  ; tweets and retweets that just been created are retweeted
-  ; if fake, 70% maior chance
-  ; inserir na lista de retweet
-  let filtertweets []
+  ; if fake, 70% maior chance - NAO ESTA SENDO UTILIZADO MAS DEVE
 
-  foreach all-tweets [    ; filter the tweets that were tweeted or retweeted in the last tick
+  foreach all-tweets [
     fTweet ->
-      if  (ticks > 0) and (item 3 fTweet = (ticks - 1)) [
-         set filtertweets lput fTweet filtertweets
-      ]
-  ]
-  let users-retweeting []
-  let new-retweet-id 0
-  let tweet-root-id []
+      if  (ticks > 0) and (item 3 fTweet = (ticks - 1)) [  ; filter the tweets that were tweeted or retweeted in the last tick
+        let users-retweeting [] ; setting the list of users that will retweet - has to be blank at the beginning
+        let comparable-interest 0 ; creating the comparable interest
 
-  foreach filtertweets [
-    fTweet ->
-      let comparable-interest 0
-      let retweet? false
-      set users-retweeting []
-
-      let tweet-sharer (item 2 fTweet)
-
-      ask tweet-sharer [
-        ask link-neighbors [  ; linked to the sharer
-          set tweet-root-id tweets-retweets-list
-          set comparable-interest abs((item 5 fTweet) - user-positioning) ;;;;;;;;; get the diference between the tweet positioning and user positioning, if its not far, retweet
-          if (comparable-interest < #-threashold-tweet-interest) and (not member? (item 1 fTweet) tweet-root-id)[
-            set users-retweeting lput self users-retweeting  ; list users linked that want to retweet
+        ask (item 2 fTweet) [ ; ask the tweet sharer
+          ask link-neighbors [  ; linked to the sharer
+            let tweet-root-id tweets-retweets-list ; return a list with all root id
+            set comparable-interest abs((item 5 fTweet) - user-positioning) ; get the diference between the tweet positioning and user positioning, if its not far, retweet
+            if (comparable-interest < #-threashold-tweet-interest) and (not member? (item 1 fTweet) tweet-root-id)[ ;
+              set users-retweeting lput self users-retweeting  ; users linked that want to retweet
+            ]
           ]
         ]
-      ]
-      print "---------- show ----------"
-      show fTweet
-      show users-retweeting
-      print "--------------------------"
 
-      foreach users-retweeting [
-        user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
-          let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet [id id-root tweet-sharer tick mood positioning fake?]
-          share-tweet new-retweet
+        foreach users-retweeting [
+          user-retweeting -> ask user-retweeting [  ; retweet - create a tweet with characteristics from the one it wants to retweet
+            let new-retweet (list id-tweets (item 0 fTweet) self ticks (item 4 fTweet) (item 5 fTweet) (item 6 fTweet)) ; tweet structure: [id id-root tweet-sharer tick mood positioning fake?]
+            set retweet-list lput (item 0 new-retweet) retweet-list
+            share-tweet new-retweet
+
+          ]
         ]
-      ]
+     ]
   ]
 end
 
+; SHARE TWEETS
+;
+; used in generate-tweets and retweet-tweets
+; procedure that recieves the new tweet and shares it
+; sharing consist in putting on the super list and setting the links color
+; this code was equal in two procedures
+;
 to share-tweet [tweet]
-  set id-tweets (id-tweets + 1) ; increment of the id-tweet
+   set id-tweets (id-tweets + 1) ; increment of the id-tweet
+   set all-tweets lput tweet all-tweets ; put the new tweet on the super list
 
-  set all-tweets lput tweet all-tweets
-  set retweet-list lput (item 0 tweet) retweet-list
-  let my-links-to-friends []
-
-
-   set my-links-to-friends sort my-out-links
-
-    foreach my-links-to-friends [
-      mlink -> ask mlink [
-        (ifelse ((item 0 tweet) = (item 1 tweet)) and (item 6 tweet)[
-          set color 15
-          ; print "true and tweet"
-        ]((item 0 tweet) = (item 1 tweet))[
-          ; print "fake and tweet"
-          set color 55
-        ]((item 0 tweet) != (item 1 tweet)) and (item 6 tweet)[
-          ; print "true and retweet"
-          set color 17
-        ]((item 0 tweet) != (item 1 tweet))[
-          ; print "fake and retweet"
-          set color 57
-        ])
-        set thickness .3
-        set shape "friendship"
-      ]
+    ask my-out-links[ ; setting colors
+      (ifelse ((item 0 tweet) = (item 1 tweet)) and (item 6 tweet)[ ; verify if its tweet and true
+        set color 15
+      ]((item 0 tweet) = (item 1 tweet))[ ; verify if its tweet and false
+        set color 55
+      ]((item 0 tweet) != (item 1 tweet)) and (item 6 tweet)[ ; verify if its retweet and true
+        set color 17
+      ]((item 0 tweet) != (item 1 tweet))[ ; verify if its retweet and false
+        set color 57
+      ])
+      set thickness .3
+      set shape "friendship"
     ]
 end
 
-to refresh-links-follow
+; REFRESH LINKS FOLLOW
+;
+; used in go
+; procedure that review the retweets and follow users that produce interesting content for the current user
+; need setup influencers after
+;
+to refresh-links-follow ; apparently doesn't work
   ask users [
-    let linked-friends []
-
-    ask link-neighbors [
-      set linked-friends lput self linked-friends
-    ]
-
-    let listed-users []
+    let listed-users [] ; list with users that current user will follow
     let tweet-sharer nobody
 
-    foreach retweet-list [
+    foreach retweet-list [ ; goes throught all the tweets from the user
       retweet ->
         set tweet-sharer find-tweet-sharer retweet
-        if (tweet-sharer != nobody) and (not member? tweet-sharer linked-friends) and (tweet-sharer != self)[
-          set listed-users lput tweet-sharer listed-users
+        if (tweet-sharer != nobody) and (not member? tweet-sharer link-neighbors) and (tweet-sharer != self)[ ; see if the sharer of that tweet isn't already their friend
+          set listed-users lput tweet-sharer listed-users ; if they aren't, theyl'll be put on this list
         ]
     ]
 
     set listed-users remove-duplicates listed-users
 
     foreach listed-users [
-      listed-user -> ask listed-user [
+      listed-user -> ask listed-user [ ; all the users that produce interesting content and will be followed
+        print "------------ NEW FRIEND ------------"
         create-edge-with myself
       ]
     ]
   ]
 end
 
-
-to refresh-links-unfollow
+; REFRESH LINKS UNFOLLOW
+;
+; used in go
+; procedure that review the retweets and unfollow users that produce interesting content for that user
+; need setup influencers after
+;
+to refresh-links-unfollow ; apparently doesn't work
   ask users [
-    let list-to-compare retweet-list
+    let list-to-compare retweet-list ; retweet list from the main user
 
     ask link-neighbors [
-      let keep? false
+      let unfollow? true
       let tweet-sharer nobody
-      foreach list-to-compare [
+      foreach list-to-compare [ ; foreach all their retweet list
         tweet-listed ->
-        set tweet-sharer find-tweet-sharer tweet-listed
-          if tweet-sharer != nobody and self = tweet-sharer [
-            set keep? true
+          set tweet-sharer find-tweet-sharer tweet-listed ; get the sharer of the tweet
+          if tweet-sharer != nobody and self = tweet-sharer [ ; if the tweeted sharer did tweet something, they won't be unfollowed
+            set unfollow? false
           ]
       ]
-      if keep? [
-        print self
-        die
+      if unfollow? [ ; if they weren't he author of any tweets retweeted, they'll be unfollowed
+        ; print "------------ UNFOLLOW FRIEND ------------"
+        ; die
       ]
     ]
   ]
 end
 
-to change-users-positioning ; if user is neutral and its inserted in a polarized environment, they can change opinions
-  let right-friends []
+
+; CHANGE USERS POSITIONING
+;
+; used in go
+; procedure if user is neutral and its inserted in a polarized environment, they can change opinions
+; need setup colors after
+;
+to change-users-positioning
+  let right-friends []  ; starting the list
   let left-friends []
   let neutral-friends []
 
   ask users [
-    if (user-positioning > 0.45) and (user-positioning < 0.55) [
+    if (user-positioning > 0.45) and (user-positioning < 0.55) [ ; setting the links/friends in the list according to their positioning
       ask link-neighbors [
         (ifelse user-positioning > 0.55 [
           set right-friends lput self right-friends
@@ -603,9 +601,9 @@ to change-users-positioning ; if user is neutral and its inserted in a polarized
         ])
       ]
 
-      if (length right-friends + length left-friends) > (length neutral-friends) [
+      if (length right-friends) > (length neutral-friends) or (length left-friends) > (length neutral-friends) [ ; virify if the node isn't on a polarized environment
         ifelse(length right-friends > length left-friends)[
-          set user-positioning (user-positioning + (length right-friends * #-influence-positioning)) ;;;; need to see math
+          set user-positioning (user-positioning + (length right-friends * #-influence-positioning)) ; add the threashold into the user-positioning variable from user - threashold * number of friends
         ][
           set user-positioning (user-positioning + (length left-friends * #-influence-positioning))
         ]
@@ -614,6 +612,11 @@ to change-users-positioning ; if user is neutral and its inserted in a polarized
   ]
 end
 
+; SETUP COLORS
+;
+; used in setup and go
+; procedure to setup the color of the node depending on its positioning
+;
 to setup-colors
   ask users [
     (ifelse user-positioning > 0.55 [
@@ -626,12 +629,21 @@ to setup-colors
   ]
 end
 
+; SETUP TWEETS
+;
+; used in setup
+; procedure to inicialize global variables: all-tweets = [] and id-tweets = 0
+;
 to setup-tweets
   set all-tweets []
   set id-tweets 0
 end
 
-
+; FIND TWEET
+;
+; used in find-tweet-sharer, tweets-retweets-list
+; procedure that returns the tweet (list) reciving the id from the tweet
+;
 to-report find-tweet [id-to-search]
   foreach all-tweets [
    tweet ->
@@ -642,6 +654,11 @@ to-report find-tweet [id-to-search]
   report []
 end
 
+; FIND TWEET SHARER
+;
+; used in refresh-links-follow and refresh-links-unfollow
+; procedure that returns the user that tweeted or retweeted that tweet reciving the id from the tweet
+;
 to-report find-tweet-sharer [id-to-search]
   let tweet find-tweet id-to-search
   if not empty? tweet [
@@ -650,16 +667,22 @@ to-report find-tweet-sharer [id-to-search]
   report nobody
 end
 
+; TWEETS RETWEETS LIST
+;
+; used in retweet-tweets
+; procedure that returns a list with all id of tweets and retweets (id-root) by that user
+;
 to-report tweets-retweets-list
   let tweet-root-id []
   foreach retweet-list [
-      tweet ->
-        set tweet-root-id lput tweet tweet-root-id
+      id-tweet ->  ; return the id-root because its the one compared
+        set tweet-root-id lput (item 1 (find-tweet id-tweet)) tweet-root-id
     ]
-    foreach tweet-list [
-      tweet ->
-        set tweet-root-id lput tweet tweet-root-id
-    ]
+  foreach tweet-list [
+     tweet ->
+       set tweet-root-id lput tweet tweet-root-id
+   ]
+  set tweet-root-id remove-duplicates tweet-root-id
   report tweet-root-id
 end
 @#$#@#$#@
@@ -742,7 +765,7 @@ CHOOSER
 network-type
 network-type
 "erdos-renyi" "barabasi-albert" "small-world" "uniform"
-0
+1
 
 SLIDER
 660
@@ -906,8 +929,8 @@ BUTTON
 82
 135
 115
-step
-step
+go
+go
 NIL
 1
 T
@@ -927,7 +950,7 @@ num-nodes
 num-nodes
 0
 1000
-25.0
+20.0
 5
 1
 NIL
@@ -1034,7 +1057,7 @@ SLIDER
 #-medium-rate
 0
 1
-0.1
+0.4
 0.05
 1
 NIL
@@ -1070,7 +1093,7 @@ SLIDER
 #-threashold-tweet-interest
 0
 1
-0.4
+0.2
 0.05
 1
 NIL
