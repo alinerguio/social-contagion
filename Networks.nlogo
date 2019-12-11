@@ -522,7 +522,7 @@ end
 ; REFRESH LINKS FOLLOW
 ;
 ; used in go
-; procedure that review the retweets and follow users that produce interesting content for the current user
+; procedure that review the retweets and follow users that produce interesting content for the current user (only influencers are followed)
 ; need setup influencers after
 ;
 to refresh-links-follow ; apparently doesn't work
@@ -537,19 +537,13 @@ to refresh-links-follow ; apparently doesn't work
 
     foreach retweet-list [ ; goes throught all the tweets from the user
       retweet ->
-        set tweet-sharer find-tweet-last-sharer retweet
+        set tweet-sharer find-tweet-author retweet
         if (tweet-sharer != nobody) and (not member? tweet-sharer linked-friends) and (tweet-sharer != self)[ ; see if the sharer of that tweet isn't already their friend
-          set listed-users lput tweet-sharer listed-users ; if they aren't, theyl'll be put on this list
+          ask tweet-sharer [ ; if they aren't, theyl'll be asked to create a link
+            print "------------ NEW FRIEND ------------"
+            create-edge-with myself
+          ]
         ]
-    ]
-
-    set listed-users remove-duplicates listed-users
-
-    foreach listed-users [
-      listed-user -> ask listed-user [ ; all the users that produce interesting content and will be followed
-        print "------------ NEW FRIEND ------------"
-        create-edge-with myself
-      ]
     ]
   ]
 end
@@ -557,7 +551,7 @@ end
 ; REFRESH LINKS UNFOLLOW
 ;
 ; used in go
-; procedure that review the retweets and unfollow users that produce interesting content for that user
+; procedure that review the retweets and unfollow users that don't produce interesting content for that user
 ; need setup influencers after
 ;
 to refresh-links-unfollow ; apparently doesn't work
@@ -567,16 +561,18 @@ to refresh-links-unfollow ; apparently doesn't work
     ask link-neighbors [
       let unfollow? true
       let tweet-sharer nobody
+      let tweet []
       foreach list-to-compare [ ; foreach all their retweet list
         tweet-listed ->
-          set tweet-sharer find-tweet-last-sharer tweet-listed ; get the sharer of the tweet
+          set tweet find-tweet tweet-listed ; get the tweet
+          set tweet-sharer (item 7 tweet)   ; get the user that shared the tweet with the current user
           if tweet-sharer != nobody and self = tweet-sharer [ ; if the tweeted sharer did tweet something, they won't be unfollowed
             set unfollow? false
           ]
       ]
       if unfollow? [ ; if they weren't he author of any tweets retweeted, they'll be unfollowed
-      ; print "------------ UNFOLLOW FRIEND ------------"
-      ; die
+        print "------------ UNFOLLOW FRIEND ------------"
+        die
       ]
     ]
   ]
@@ -646,7 +642,7 @@ end
 
 ; FIND TWEET
 ;
-; used in find-tweet-sharer, tweets-retweets-list
+; used in find-tweet-author, tweets-retweets-list, refresh-links-unfollow
 ; procedure that returns the tweet (list) reciving the id from the tweet
 ;
 to-report find-tweet [id-to-search]
@@ -661,13 +657,14 @@ end
 
 ; FIND TWEET SHARER
 ;
-; used in refresh-links-follow and refresh-links-unfollow
-; procedure that returns the user that tweeted or retweeted the tweet to the current user retweet
+; used in refresh-links-follow
+; procedure that returns the user that created the tweet root that originated the tweet passed as parameter
 ;
-to-report find-tweet-last-sharer [id-to-search]
+to-report find-tweet-author [id-to-search]
   let tweet find-tweet id-to-search
   if not empty? tweet [
-    report (item 7 tweet)
+    let tweet-root find-tweet (item 1 tweet)
+    report (item 2 tweet-root)
   ]
   report nobody
 end
@@ -770,7 +767,7 @@ CHOOSER
 network-type
 network-type
 "erdos-renyi" "barabasi-albert" "small-world" "uniform"
-1
+0
 
 SLIDER
 660
@@ -864,7 +861,7 @@ M
 M
 0
 50
-4.0
+15.0
 1
 1
 NIL
@@ -955,7 +952,7 @@ num-nodes
 num-nodes
 0
 1000
-20.0
+30.0
 5
 1
 NIL
