@@ -4,15 +4,17 @@ Social contagion in Networks made in NetLogo.
 
 ## New ideas
 
-Não precisar criar novos agentes para retweet, só colocar na lista e repassar para amigos
+Need: 
+   -> Ideas of parts of the code that need to be re-written;
+   -> What are we going to write the article about.
 
-A cada tick o agente tem três opções: rt, tweet ou nada - agente não procura, tweet chega para ele 
+## New updates
+
+Code was re-written.
 
 ## New issues
 
-Não consegui fazer com lista -> problema com foreach
-
-Como referenciar a lista de dentro do foreach 
+Still generates a lot of tweets, but i don't belive it a mistake, its only the variables used.
 
 
  
