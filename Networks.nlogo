@@ -1,9 +1,10 @@
 ; Social Contagion in social networks
 ;
 ; Aline Guimarães
+; alinerguio@gmail.com
+; Universidade Federal de Lavras
 ;
-;
-; COMENTAR O CODIGO
+; 2019
 ; -----------------------------------------------------------------------------------
 ; Base code by:
 ; steve scott
